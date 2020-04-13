@@ -21,6 +21,15 @@ where
         Ok(bincode::deserialize_from(backend.read(range))?)
     }
 
+    fn init(&mut self, backend: &dyn Backend) -> Result<(), Box<dyn Error>> {
+        let range = std::ops::Range {
+            start: self.start(),
+            end: (self.start() + Self::size()),
+        };
+        *self = bincode::deserialize_from(backend.read(range))?;
+        Ok(())
+    }
+
     fn save(&self, backend: &mut dyn Backend) -> Result<usize, Box<dyn Error>> {
         let range = std::ops::Range {
             start: self.start(),
