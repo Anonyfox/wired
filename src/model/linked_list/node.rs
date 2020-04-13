@@ -33,6 +33,14 @@ where
         Ok(node)
     }
 
+    pub fn is_first(&self) -> bool {
+        self.prev_ptr == 0
+    }
+
+    pub fn is_last(&self) -> bool {
+        self.next_ptr == 0
+    }
+
     pub fn next(&self, backend: &dyn Backend) -> Result<Option<Self>, Box<dyn Error>> {
         if self.next_ptr == 0 {
             Ok(None)
@@ -42,11 +50,12 @@ where
         }
     }
 
-    pub fn prev(&self) -> Option<Self> {
+    pub fn prev(&self, backend: &dyn Backend) -> Result<Option<Self>, Box<dyn Error>> {
         if self.prev_ptr == 0 {
-            None
+            Ok(None)
         } else {
-            Some(Self::new(self.prev_ptr))
+            let node = Self::load(&*backend, self.prev_ptr)?;
+            Ok(Some(node))
         }
     }
 

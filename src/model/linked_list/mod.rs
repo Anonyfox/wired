@@ -64,38 +64,41 @@ where
         }
     }
 
+    // pub fn insert_before(
+    //     &mut self,
+    //     node: &mut Node<T>,
+    //     data: &T,
+    // ) -> Result<Node<T>, Box<dyn Error>> {
+    //     let position = self.header.get_allocator();
+    //     let mut new_node = Node::<T>::create(&mut *self.backend, position)?;
+    //     if node.is_first() {
+    //         self.header.set_first_node_ptr(new_node.start());
+    //         self.header.save(&mut *self.backend)?;
+    //     }
+    //     node.set_prev(&mut *self.backend, &new_node)?;
+    //     new_node.set_next(&mut *self.backend, &node)?;
+    //     new_node.data_store(&mut *self.backend, &data);
+    //     Ok(new_node)
+    // }
+
     pub fn push(&mut self, data: &T) -> Result<Node<T>, Box<dyn Error>> {
         let position = self.header.get_allocator();
         let mut new_node = Node::create(&mut *self.backend, position)?;
         if let Some(mut last_node) = self.last_node()? {
             last_node.set_next(&mut *self.backend, &new_node)?;
             new_node.set_prev(&mut *self.backend, &last_node)?;
-        } else {
-            new_node.save(&mut *self.backend)?;
-            self.header.set_first_node_ptr(new_node.start());
         };
         new_node.data_store(&mut *self.backend, &data)?;
-        self.header.set_last_node_ptr(new_node.start());
-        self.header.inc_counter();
-        self.header.save(&mut *self.backend)?;
-        self.update_allocator(&new_node)?;
-        self.backend.persist()?;
+        self.finalize_insert(&new_node)?;
         Ok(new_node)
     }
 
     pub fn pop(&mut self) -> Result<Option<Node<T>>, Box<dyn Error>> {
         if let Some(last_node) = self.last_node()? {
-            if let Some(mut prev_node) = last_node.prev() {
-                prev_node.init(&*self.backend)?;
-                self.header.set_last_node_ptr(prev_node.start());
+            if let Some(mut prev_node) = last_node.prev(&mut *self.backend)? {
                 prev_node.set_next_empty(&mut *self.backend)?;
-            } else {
-                self.header.set_last_node_ptr(0);
-                self.header.set_first_node_ptr(0);
             }
-            self.header.dec_counter();
-            self.header.save(&mut *self.backend)?;
-            self.backend.persist()?;
+            self.finalize_removal(&last_node)?;
             Ok(Some(last_node))
         } else {
             Ok(None)
@@ -109,15 +112,9 @@ where
         if let Some(mut first_node) = self.first_node()? {
             first_node.set_prev(&mut *self.backend, &new_node)?;
             new_node.set_next(&mut *self.backend, &first_node)?;
-        } else {
-            self.header.set_last_node_ptr(new_node.start());
         }
         new_node.data_store(&mut *self.backend, &data)?;
-        self.header.set_first_node_ptr(new_node.start());
-        self.header.inc_counter();
-        self.header.save(&mut *self.backend)?;
-        self.update_allocator(&new_node)?;
-        self.backend.persist()?;
+        self.finalize_insert(&new_node)?;
         Ok(new_node)
     }
 
@@ -125,19 +122,48 @@ where
     pub fn shift(&mut self) -> Result<Option<Node<T>>, Box<dyn Error>> {
         if let Some(first_node) = self.first_node()? {
             if let Some(mut next_node) = first_node.next(&*self.backend)? {
-                self.header.set_first_node_ptr(next_node.start());
                 next_node.set_prev_empty(&mut *self.backend)?;
-            } else {
-                self.header.set_last_node_ptr(0);
-                self.header.set_first_node_ptr(0);
             }
-            self.header.dec_counter();
-            self.header.save(&mut *self.backend)?;
-            self.backend.persist()?;
+            self.finalize_removal(&first_node)?;
             Ok(Some(first_node))
         } else {
             Ok(None)
         }
+    }
+
+    fn finalize_insert(&mut self, new_node: &Node<T>) -> Result<(), Box<dyn Error>> {
+        if new_node.is_first() {
+            self.header.set_first_node_ptr(new_node.start());
+        }
+        if new_node.is_last() {
+            self.header.set_last_node_ptr(new_node.start());
+        }
+        self.header.inc_counter();
+        self.header.save(&mut *self.backend)?;
+        self.update_allocator(&new_node)?;
+        self.backend.persist()?;
+        Ok(())
+    }
+
+    fn finalize_removal(&mut self, old_node: &Node<T>) -> Result<(), Box<dyn Error>> {
+        if old_node.is_first() {
+            let next_ptr = old_node
+                .next(&*self.backend)?
+                .unwrap_or(Node::new(0))
+                .start();
+            self.header.set_first_node_ptr(next_ptr);
+        }
+        if old_node.is_last() {
+            let prev_ptr = old_node
+                .prev(&*self.backend)?
+                .unwrap_or(Node::new(0))
+                .start();
+            self.header.set_last_node_ptr(prev_ptr);
+        }
+        self.header.dec_counter();
+        self.header.save(&mut *self.backend)?;
+        self.backend.persist()?;
+        Ok(())
     }
 
     fn update_allocator(&mut self, node: &Node<T>) -> Result<(), Box<dyn Error>> {
@@ -145,7 +171,6 @@ where
         if position > self.header.get_allocator() {
             self.header.set_allocator(position);
             self.header.save(&mut *self.backend)?;
-            self.backend.persist()?;
         }
         Ok(())
     }
