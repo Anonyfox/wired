@@ -6,6 +6,7 @@ WIP: Collection of embeddable database models for Rust.
 
 - schema-free: use anything that can be serialized with serde
 - portable: every database is persisted with a single memory-mapped binary file
+- lightweight: pure Rust implementation
 
 ## Available Models
 
