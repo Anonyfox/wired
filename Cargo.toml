@@ -3,6 +3,12 @@ name = "wired"
 version = "0.1.0"
 authors = ["Anonyfox <hisako1337@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "WIP: Collection of embeddable database models for Rust."
+repository = "https://github.com/Anonyfox/wired/"
+readme = "README.md"
+keywords = ["embedded", "database"]
+categories = ["caching", "database-implementations", "data-structures", "embedded", "filesystem"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
