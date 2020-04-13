@@ -1,6 +1,7 @@
 mod header;
 mod node;
 
+use super::Model;
 use crate::backend::{Backend, DataBlock, Mmap, StaticBlock};
 use header::Header;
 use node::Node;
@@ -11,28 +12,12 @@ pub struct LinkedList {
     backend: Box<dyn Backend>,
 }
 
+impl Model for LinkedList {}
+
 impl LinkedList {
     pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
         let backend = Self::connect_backend(&path)?;
         Self::initialize_state(backend)
-    }
-
-    #[cfg(test)]
-    fn connect_backend(_path: &str) -> Result<Box<dyn Backend>, Box<dyn Error>> {
-        let file = tempfile::tempfile()?;
-        let backend = Mmap::new(file)?;
-        Ok(Box::new(backend))
-    }
-
-    #[cfg(not(test))]
-    fn connect_backend(path: &str) -> Result<Box<dyn Backend>, Box<dyn Error>> {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&path)?;
-        let backend = Mmap::new(file)?;
-        Ok(Box::new(backend))
     }
 
     fn initialize_state(mut backend: Box<dyn Backend>) -> Result<Self, Box<dyn Error>> {
