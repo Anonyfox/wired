@@ -6,6 +6,7 @@ pub struct Header {
     first_node_ptr: usize,
     last_node_ptr: usize,
     element_count: usize,
+    allocate_ptr: usize,
 }
 
 impl StaticBlock for Header {
@@ -41,5 +42,13 @@ impl Header {
 
     pub fn dec_counter(&mut self) {
         self.element_count -= 1
+    }
+
+    pub fn get_allocator(&self) -> usize {
+        self.allocate_ptr
+    }
+
+    pub fn set_allocator(&mut self, ptr: usize) {
+        self.allocate_ptr = ptr;
     }
 }

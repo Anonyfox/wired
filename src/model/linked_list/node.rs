@@ -1,5 +1,6 @@
-use crate::backend::{DataBlock, StaticBlock};
+use crate::backend::{Backend, DataBlock, StaticBlock};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 // use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -18,15 +19,18 @@ impl Node {
         }
     }
 
-    pub fn ptr(&self) -> usize {
-        self.position
+    pub fn create(backend: &mut dyn Backend, position: usize) -> Result<Self, Box<dyn Error>> {
+        let node = Self::new(position);
+        node.save(&mut *backend)?;
+        Ok(node)
     }
 
-    pub fn next(&self) -> Option<Self> {
+    pub fn next(&self, backend: &dyn Backend) -> Result<Option<Self>, Box<dyn Error>> {
         if self.next_ptr == 0 {
-            None
+            Ok(None)
         } else {
-            Some(Self::new(self.next_ptr))
+            let node = Self::load(&*backend, self.next_ptr)?;
+            Ok(Some(node))
         }
     }
 
@@ -38,20 +42,36 @@ impl Node {
         }
     }
 
-    pub fn set_next(&mut self, other: &Self) {
+    pub fn set_next(
+        &mut self,
+        backend: &mut dyn Backend,
+        other: &Self,
+    ) -> Result<(), Box<dyn Error>> {
         self.next_ptr = other.position;
+        self.save(&mut *backend)?;
+        Ok(())
     }
 
-    pub fn set_next_empty(&mut self) {
+    pub fn set_next_empty(&mut self, backend: &mut dyn Backend) -> Result<(), Box<dyn Error>> {
         self.next_ptr = 0;
+        self.save(&mut *backend)?;
+        Ok(())
     }
 
-    pub fn set_prev(&mut self, other: &Self) {
+    pub fn set_prev(
+        &mut self,
+        backend: &mut dyn Backend,
+        other: &Self,
+    ) -> Result<(), Box<dyn Error>> {
         self.prev_ptr = other.position;
+        self.save(&mut *backend)?;
+        Ok(())
     }
 
-    pub fn set_prev_empty(&mut self) {
-        self.next_ptr = 0;
+    pub fn set_prev_empty(&mut self, backend: &mut dyn Backend) -> Result<(), Box<dyn Error>> {
+        self.prev_ptr = 0;
+        self.save(&mut *backend)?;
+        Ok(())
     }
 }
 

@@ -36,7 +36,10 @@ impl LinkedList {
     }
 
     fn initialize_state(mut backend: Box<dyn Backend>) -> Result<Self, Box<dyn Error>> {
-        let header = Header::load(&*backend, 0)?;
+        let mut header = Header::load(&*backend, 0)?;
+        if header.element_count() == 0 {
+            header.set_allocator(Header::size());
+        }
         header.save(&mut *backend)?;
         Ok(Self {
             header,
@@ -70,31 +73,29 @@ impl LinkedList {
     }
 
     pub fn push(&mut self) -> Result<Node, Box<dyn Error>> {
-        let position = self.next_free_position()?;
-        let mut new_node = Node::new(position);
+        let position = self.header.get_allocator();
+        let mut new_node = Node::create(&mut *self.backend, position)?;
         if let Some(mut last_node) = self.last_node()? {
-            last_node.set_next(&new_node);
-            last_node.save(&mut *self.backend)?;
-            new_node.set_prev(&last_node);
+            last_node.set_next(&mut *self.backend, &new_node)?;
+            new_node.set_prev(&mut *self.backend, &last_node)?;
         } else {
+            new_node.save(&mut *self.backend)?;
             self.header.set_first_node_ptr(new_node.start());
         };
-        new_node.save(&mut *self.backend)?;
         self.header.set_last_node_ptr(new_node.start());
         self.header.inc_counter();
         self.header.save(&mut *self.backend)?;
+        self.update_allocator(&new_node)?;
         self.backend.persist()?;
         Ok(new_node)
     }
 
     pub fn pop(&mut self) -> Result<Option<Node>, Box<dyn Error>> {
         if let Some(last_node) = self.last_node()? {
-            dbg!(&last_node);
             if let Some(mut prev_node) = last_node.prev() {
                 prev_node.init(&*self.backend)?;
                 self.header.set_last_node_ptr(prev_node.start());
-                prev_node.set_next_empty();
-                prev_node.save(&mut *self.backend)?;
+                prev_node.set_next_empty(&mut *self.backend)?;
             } else {
                 self.header.set_last_node_ptr(0);
                 self.header.set_first_node_ptr(0);
@@ -108,26 +109,51 @@ impl LinkedList {
         }
     }
 
-    pub fn unshift(&mut self) -> Result<Option<Node>, Box<dyn Error>> {
-        // adds one item in front
-        // impl after space management is done
-        Ok(None)
-    }
-
-    pub fn shift(&mut self) -> Result<Option<Node>, Box<dyn Error>> {
-        // removes one item from front
-        // impl after space management is done
-        Ok(None)
-    }
-
-    fn next_free_position(&self) -> Result<usize, Box<dyn Error>> {
-        if let Some(last_node) = self.last_node()? {
-            // TODO: this is VERY naive for now
-            let position = last_node.start() + Node::size();
-            Ok(position)
+    // adds one item in front
+    pub fn unshift(&mut self) -> Result<Node, Box<dyn Error>> {
+        let position = self.header.get_allocator();
+        let mut new_node = Node::create(&mut *self.backend, position)?;
+        if let Some(mut first_node) = self.first_node()? {
+            first_node.set_prev(&mut *self.backend, &new_node)?;
+            new_node.set_next(&mut *self.backend, &first_node)?;
         } else {
-            Ok(Header::size())
+            self.header.set_last_node_ptr(new_node.start());
         }
+        self.header.set_first_node_ptr(new_node.start());
+        self.header.inc_counter();
+        self.header.save(&mut *self.backend)?;
+        self.update_allocator(&new_node)?;
+        self.backend.persist()?;
+        Ok(new_node)
+    }
+
+    // removes one item from front
+    pub fn shift(&mut self) -> Result<Option<Node>, Box<dyn Error>> {
+        if let Some(first_node) = self.first_node()? {
+            if let Some(mut next_node) = first_node.next(&*self.backend)? {
+                self.header.set_first_node_ptr(next_node.start());
+                next_node.set_prev_empty(&mut *self.backend)?;
+            } else {
+                self.header.set_last_node_ptr(0);
+                self.header.set_first_node_ptr(0);
+            }
+            self.header.dec_counter();
+            self.header.save(&mut *self.backend)?;
+            self.backend.persist()?;
+            Ok(Some(first_node))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn update_allocator(&mut self, node: &Node) -> Result<(), Box<dyn Error>> {
+        let position = node.start() + Node::size();
+        if position > self.header.get_allocator() {
+            self.header.set_allocator(position);
+            self.header.save(&mut *self.backend)?;
+            self.backend.persist()?;
+        }
+        Ok(())
     }
 }
 
@@ -156,6 +182,25 @@ mod tests {
     #[test]
     fn shift_and_unshift() {
         let mut list = LinkedList::new("works.list").expect("can not create");
+        assert_eq!(list.count(), 0);
+
+        list.unshift().expect("couldn't unshift");
+        assert_eq!(list.count(), 1);
+
+        list.unshift().expect("couldn't unshift");
+        assert_eq!(list.count(), 2);
+
+        list.shift().expect("couldn't shift");
+        assert_eq!(list.count(), 1);
+
+        list.shift().expect("couldn't shift");
+        assert_eq!(list.count(), 0);
+    }
+
+    #[test]
+    #[ignore]
+    fn generic_data() {
+        let list = LinkedList::new("works.list").expect("can not create");
         assert_eq!(list.count(), 0);
     }
 }
