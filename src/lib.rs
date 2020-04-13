@@ -1,3 +1,8 @@
+mod backend;
+mod model;
+
+pub use model::Stack;
+
 #[cfg(test)]
 mod tests {
     #[test]
