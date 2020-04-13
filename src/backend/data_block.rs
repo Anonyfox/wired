@@ -19,6 +19,7 @@ where
     fn data_store(&mut self, backend: &mut dyn Backend, data: &T) -> Result<usize, Box<dyn Error>> {
         let bytes: Vec<u8> = bincode::serialize(&data)?;
         self.set_data_size(bytes.len());
+        self.save(&mut *backend)?;
         let range = self.data_range();
         backend.write(range, &bytes)?;
         Ok(bytes.len())

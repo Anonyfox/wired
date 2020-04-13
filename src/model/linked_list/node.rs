@@ -1,21 +1,29 @@
 use crate::backend::{Backend, DataBlock, StaticBlock};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-// use std::marker::PhantomData;
+use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Node {
+pub struct Node<T> {
     position: usize,
     next_ptr: usize,
     prev_ptr: usize,
+    data_type: PhantomData<T>,
+    data_size: usize,
 }
 
-impl Node {
+impl<T> Node<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
     pub fn new(position: usize) -> Self {
         Self {
             position,
             next_ptr: 0,
             prev_ptr: 0,
+            data_type: PhantomData,
+            data_size: 0,
         }
     }
 
@@ -75,8 +83,26 @@ impl Node {
     }
 }
 
-impl StaticBlock for Node {
+impl<T> StaticBlock for Node<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
     fn start(&self) -> usize {
         self.position
+    }
+}
+
+impl<T> DataBlock<T> for Node<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
+    fn data_size(&self) -> usize {
+        self.data_size
+    }
+
+    fn set_data_size(&mut self, size: usize) {
+        self.data_size = size;
     }
 }
