@@ -168,6 +168,10 @@ where
         }
         Ok(())
     }
+
+    pub fn get_node_data(&self, node: &Node<T>) -> Result<T, Error> {
+        node.data_fetch(&*self.backend)
+    }
 }
 
 #[cfg(test)]
