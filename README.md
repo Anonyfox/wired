@@ -14,7 +14,7 @@ WIP: Collection of embeddable database models for Rust.
 ## Available Models
 
 - [x] Stack
-- [ ] Queue
+- [x] Queue
 - [ ] Key-Value
 - [ ] Document
 - [ ] Graph
