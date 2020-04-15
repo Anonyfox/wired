@@ -44,6 +44,16 @@ where
         self.header.element_count()
     }
 
+    pub fn allocated_bytes(&self) -> usize {
+        self.header.get_allocator()
+    }
+
+    pub fn used_bytes(&self) -> usize {
+        let max = self.allocated_bytes();
+        let unused = self.header.get_unused_bytes();
+        max - unused
+    }
+
     pub fn first_node(&self) -> Result<Option<Node<T>>, Error> {
         let position = self.header.get_first_node_ptr();
         let node = Node::load(&*self.backend, position)?;
@@ -155,6 +165,8 @@ where
             self.header.set_last_node_ptr(prev_ptr);
         }
         self.header.dec_counter();
+        let unused_bytes = Node::<T>::size() + old_node.data_size();
+        self.header.inc_unused_bytes(unused_bytes);
         self.header.save(&mut *self.backend)?;
         self.backend.persist()?;
         Ok(())
@@ -198,6 +210,7 @@ mod tests {
         assert!(node2.is_first());
         assert!(node1.is_last());
         assert!(!node2.is_last());
+        assert_eq!(list.used_bytes(), 130);
     }
 
     #[test]

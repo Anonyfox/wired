@@ -7,6 +7,7 @@ pub struct Header {
     last_node_ptr: usize,
     element_count: usize,
     allocate_ptr: usize,
+    unused_bytes: usize,
 }
 
 impl StaticBlock for Header {
@@ -50,5 +51,13 @@ impl Header {
 
     pub fn set_allocator(&mut self, ptr: usize) {
         self.allocate_ptr = ptr;
+    }
+
+    pub fn inc_unused_bytes(&mut self, amount: usize) {
+        self.unused_bytes += amount;
+    }
+
+    pub fn get_unused_bytes(&self) -> usize {
+        self.unused_bytes
     }
 }
