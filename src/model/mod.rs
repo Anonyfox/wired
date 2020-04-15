@@ -1,12 +1,6 @@
 use super::backend::{Backend, Mmap};
 use std::error::Error;
 
-mod stack;
-pub use stack::Stack;
-
-mod queue;
-pub use queue::Queue;
-
 mod linked_list;
 pub use linked_list::LinkedList;
 

@@ -1,4 +1,4 @@
-use super::LinkedList;
+use crate::model::LinkedList;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 

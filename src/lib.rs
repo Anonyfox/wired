@@ -1,7 +1,9 @@
 mod backend;
+mod database;
 mod model;
 
-pub use model::Stack;
+pub use database::queue::Queue;
+pub use database::stack::Stack;
 
 #[cfg(test)]
 mod tests {
