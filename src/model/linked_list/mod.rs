@@ -5,12 +5,14 @@ use super::Model;
 use crate::backend::{Backend, DataBlock, StaticBlock};
 use header::Header;
 use node::Node;
+use std::clone::Clone;
 use std::marker::PhantomData;
 
 type Error = Box<dyn std::error::Error>;
 
 pub struct LinkedList<T> {
     header: Header,
+    path: String,
     backend: Box<dyn Backend>,
     data_type: PhantomData<T>,
 }
@@ -24,10 +26,10 @@ where
 {
     pub fn new(path: &str) -> Result<Self, Error> {
         let backend = Self::connect_backend(&path)?;
-        Self::initialize_state(backend)
+        Self::initialize_state(path, backend)
     }
 
-    fn initialize_state(mut backend: Box<dyn Backend>) -> Result<Self, Error> {
+    fn initialize_state(path: &str, mut backend: Box<dyn Backend>) -> Result<Self, Error> {
         let mut header = Header::load(&*backend, 0)?;
         if header.element_count() == 0 {
             header.set_allocator(Header::size());
@@ -35,9 +37,21 @@ where
         header.save(&mut *backend)?;
         Ok(Self {
             header,
+            path: path.to_string(),
             backend,
             data_type: PhantomData,
         })
+    }
+
+    pub fn compact(&mut self) -> Result<(), Error> {
+        let mut new_path = self.path.clone();
+        new_path.push_str(".tmp");
+        let mut new_list = Self::new(&new_path)?;
+        for node in self.iter()? {
+            let data = self.get_node_data(&node)?;
+            new_list.insert_end(&data)?;
+        }
+        Ok(())
     }
 
     pub fn count(&self) -> usize {
@@ -184,6 +198,64 @@ where
     pub fn get_node_data(&self, node: &Node<T>) -> Result<T, Error> {
         node.data_fetch(&*self.backend)
     }
+
+    pub fn iter(&self) -> Result<LinkedListIterator<T>, Error> {
+        Ok(LinkedListIterator {
+            current_node_ptr: self.first_node()?.map(|n| n.start()),
+            backend: &self.backend,
+            data_type: PhantomData,
+        })
+    }
+}
+
+pub struct LinkedListIterator<'a, T> {
+    current_node_ptr: Option<usize>,
+    backend: &'a Box<dyn Backend>,
+    data_type: PhantomData<T>,
+}
+
+impl<'a, T> Iterator for LinkedListIterator<'a, T>
+where
+    T: serde::Serialize,
+    for<'de> T: serde::Deserialize<'de>,
+{
+    type Item = Node<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        // if let Some(current_node_ptr) = self.current_node_ptr {
+        //     if let Ok(current_node) = Node::load(&**self.backend, current_node_ptr) {
+        //         if let
+        //         let next_node = Node::load(&**self.backend, current_node_ptr).unwrap_or(None);
+        //     }
+        //     let next_node = Node::load(&**self.backend, current_node_ptr).unwrap_or(None);
+        //     self.current_node_ptr = next_node
+        //     let current_node = std::mem::replace(&mut self.current_node, next_node);
+        //     current_node
+        // } else {
+        //     None
+        // }
+        if let Ok(node) = self.try_next() {
+            node
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, T> LinkedListIterator<'a, T>
+where
+    T: serde::Serialize,
+    for<'de> T: serde::Deserialize<'de>,
+{
+    fn try_next(&mut self) -> Result<Option<Node<T>>, Error> {
+        if let Some(current_node_ptr) = self.current_node_ptr {
+            let current_node = Node::load(&**self.backend, current_node_ptr)?;
+            let next_node = current_node.next(&**self.backend)?;
+            self.current_node_ptr = next_node.map(|n| n.start());
+            Ok(Some(current_node))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -211,6 +283,8 @@ mod tests {
         assert!(node1.is_last());
         assert!(!node2.is_last());
         assert_eq!(list.used_bytes(), 130);
+
+        list.compact().expect("could not compact");
     }
 
     #[test]
