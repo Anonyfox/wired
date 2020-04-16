@@ -42,6 +42,10 @@ where
         self.list.count()
     }
 
+    pub fn wasted_file_space(&self) -> f64 {
+        self.list.wasted_file_space()
+    }
+
     pub fn enqueue(&mut self, data: &T) -> Result<(), Box<dyn Error>> {
         self.list.insert_start(data)?;
         Ok(())
@@ -56,6 +60,11 @@ where
             self.list.remove(node)?;
             Ok(Some(data))
         }
+    }
+
+    pub fn compact(&mut self) -> Result<(), Box<dyn Error>> {
+        self.list.compact()?;
+        Ok(())
     }
 }
 

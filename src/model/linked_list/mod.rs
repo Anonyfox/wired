@@ -65,6 +65,12 @@ where
         self.header.element_count()
     }
 
+    pub fn wasted_file_space(&self) -> f64 {
+        let unused = self.used_bytes() as f64;
+        let max = self.allocated_bytes() as f64;
+        unused / max
+    }
+
     pub fn allocated_bytes(&self) -> usize {
         self.header.get_allocator()
     }
