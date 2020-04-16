@@ -18,6 +18,7 @@ WIP: Collection of embeddable database models for Rust.
 - [ ] Key-Value
 - [ ] Document
 - [ ] Graph
+- [ ] Tabular
 - [ ] Relational
 
 ## License
