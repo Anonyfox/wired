@@ -4,6 +4,7 @@ WIP: Collection of embeddable database models for Rust.
 
 [![Documentation](https://docs.rs/wired/badge.svg)](https://docs.rs/wired)
 [![Crate](https://img.shields.io/crates/v/wired.svg)](https://crates.io/crates/wired)
+![Tests](https://github.com/Anonyfox/wired/workflows/Rust/badge.svg)
 
 ## Features
 
