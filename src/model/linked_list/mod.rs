@@ -51,6 +51,13 @@ where
             let data = self.get_node_data(&node)?;
             new_list.insert_end(&data)?;
         }
+        if cfg!(test) {
+            *self = new_list;
+        } else {
+            std::fs::rename(&new_path, &self.path)?;
+            *self = Self::new(&self.path)?;
+        }
+
         Ok(())
     }
 
@@ -221,18 +228,6 @@ where
 {
     type Item = Node<T>;
     fn next(&mut self) -> Option<Self::Item> {
-        // if let Some(current_node_ptr) = self.current_node_ptr {
-        //     if let Ok(current_node) = Node::load(&**self.backend, current_node_ptr) {
-        //         if let
-        //         let next_node = Node::load(&**self.backend, current_node_ptr).unwrap_or(None);
-        //     }
-        //     let next_node = Node::load(&**self.backend, current_node_ptr).unwrap_or(None);
-        //     self.current_node_ptr = next_node
-        //     let current_node = std::mem::replace(&mut self.current_node, next_node);
-        //     current_node
-        // } else {
-        //     None
-        // }
         if let Ok(node) = self.try_next() {
             node
         } else {
@@ -335,5 +330,16 @@ mod tests {
 
         list.remove(node2).expect("couldn't remove");
         assert_eq!(list.count(), 0);
+    }
+
+    #[test]
+    fn compact() {
+        let mut list = LinkedList::<i32>::new("works.list").expect("can not create");
+        let n1 = list.insert_end(&1).expect("couldn't insert end");
+        list.remove(n1).expect("couldn't remove");
+        list.insert_end(&2).expect("couldn't insert end");
+        assert_eq!(list.allocated_bytes(), 112);
+        list.compact().expect("couldn't compact");
+        assert_eq!(list.allocated_bytes(), 76);
     }
 }
