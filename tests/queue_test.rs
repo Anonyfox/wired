@@ -34,9 +34,10 @@ fn works() {
     db.enqueue(&Message::new("msg 1")).unwrap();
     db.enqueue(&Message::new("msg 2")).unwrap();
     db.enqueue(&Message::new("msg 3")).unwrap();
+    db.enqueue(&Message::new("msg 4")).unwrap();
 
     // check for usage stats
-    assert_eq!(db.len(), 3);
+    assert_eq!(db.len(), 4);
     assert_eq!(db.wasted_file_space(), 0.0);
 
     // dequeue some data and check for IFIO ordering
@@ -44,14 +45,20 @@ fn works() {
     assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 2".to_string());
 
     // check for usage stats
-    assert_eq!(db.len(), 1);
+    assert_eq!(db.len(), 2);
     assert_ne!(db.wasted_file_space(), 0.0);
 
     // compact the database ("defragmentation")
     db.compact().unwrap();
-    assert_eq!(db.len(), 1);
+    assert_eq!(db.len(), 2);
     assert_eq!(db.wasted_file_space(), 0.0);
 
     // works after compaction
     assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 3".to_string());
+
+    // works after reopen
+    let mut db = wired::Queue::<Message>::new(path).unwrap();
+    assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 4".to_string());
+    assert_eq!(db.len(), 0);
+    assert!(db.is_empty());
 }
