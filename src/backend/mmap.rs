@@ -1,5 +1,4 @@
 use super::Backend;
-use fs2::FileExt;
 use memmap2::{MmapMut, MmapOptions};
 use std::error::Error;
 use std::fs::File;
@@ -19,14 +18,14 @@ impl Mmap {
         if size == 0 {
             file.set_len(min_size as u64)?;
         }
-        file.try_lock_exclusive()?;
         let size = std::cmp::max(size, min_size);
         let mapped_file = Self::create_file_mapping(&file, size)?;
-        Ok(Self {
+        let mmap = Self {
             file,
             mapped_file,
             size,
-        })
+        };
+        Ok(mmap)
     }
 
     fn create_file_mapping(file: &File, size: usize) -> Result<MmapMut, Box<dyn Error>> {

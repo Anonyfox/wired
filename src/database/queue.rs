@@ -42,6 +42,10 @@ where
         self.list.count()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn wasted_file_space(&self) -> f64 {
         self.list.wasted_file_space()
     }
@@ -56,7 +60,7 @@ where
             Ok(None)
         } else {
             let node = self.list.last_node()?.unwrap();
-            let data = self.list.get_node_data(&node)?;
+            let data: T = self.list.get_node_data(&node)?;
             self.list.remove(node)?;
             Ok(Some(data))
         }

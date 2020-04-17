@@ -57,7 +57,6 @@ where
             std::fs::rename(&new_path, &self.path)?;
             *self = Self::new(&self.path)?;
         }
-
         Ok(())
     }
 
@@ -68,7 +67,7 @@ where
     pub fn wasted_file_space(&self) -> f64 {
         let unused = self.used_bytes() as f64;
         let max = self.allocated_bytes() as f64;
-        unused / max
+        (max - unused) / max
     }
 
     pub fn allocated_bytes(&self) -> usize {
@@ -93,6 +92,7 @@ where
         Ok(Some(node))
     }
 
+    #[allow(dead_code)]
     pub fn insert_before(&mut self, node: &mut Node<T>, data: &T) -> Result<Node<T>, Error> {
         let position = self.header.get_allocator();
         let mut new_node = Node::<T>::create(&mut *self.backend, position)?;
@@ -107,6 +107,7 @@ where
         Ok(new_node)
     }
 
+    #[allow(dead_code)]
     pub fn insert_after(&mut self, node: &mut Node<T>, data: &T) -> Result<Node<T>, Error> {
         let position = self.header.get_allocator();
         let mut new_node = Node::<T>::create(&mut *self.backend, position)?;
