@@ -72,6 +72,18 @@ where
     }
 }
 
+impl<T> Iterator for Queue<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.dequeue().unwrap_or(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,5 +107,16 @@ mod tests {
 
         let data = queue.dequeue().expect("could not dequeue");
         assert_eq!(data, None);
+    }
+
+    #[test]
+    fn iteration() {
+        let mut queue = Queue::<i32>::new("works.queue").expect("could not create");
+        queue.enqueue(&1).expect("could not enqueue");
+        queue.enqueue(&2).expect("could not enqueue");
+        assert_eq!(queue.len(), 2);
+
+        let vec: Vec<i32> = queue.collect();
+        assert_eq!(vec, vec![1, 2]);
     }
 }
