@@ -24,6 +24,36 @@ use std::error::Error;
 /// >   dequeue.
 /// >
 /// > -- <cite>[Wikipedia](https://en.wikipedia.org/wiki/Queue_(abstract_data_type))</cite>
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // any datatype that can be serialized by serde works
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct Example {
+///     num: i32,
+/// }
+///
+/// // create a new db
+/// let mut queue = wired::Queue::<Example>::new("/path/to/file.queue")?;
+///
+/// // insert an item
+/// let item = Example { num: 42 };
+/// queue.enqueue(&item)?;
+///
+/// // retrieve an item
+/// let item = queue.dequeue()?;
+/// dbg!(item); // Some(Example { num: 42 })
+///
+/// // try retrieve an item from the now-empty queue
+/// let item = queue.dequeue()?;
+/// dbg!(item); // None
+/// # Ok(())
+/// # }
+/// ```
 pub struct Queue<T> {
     list: LinkedList<T>,
 }
@@ -33,28 +63,86 @@ where
     T: Serialize,
     for<'de> T: Deserialize<'de>,
 {
+    /// Create a new database or open an existing one for the given location.
+    /// The database is generic over a serializable datatype.
+    ///
+    /// # Examples
+    ///
+    /// Queue for strings:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Queue for structs:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Example {
+    ///     count: i32,
+    /// }
+    ///
+    /// let queue = wired::Queue::<Example>::new("/path/to/file.queue")?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
         let list = LinkedList::new(path)?;
         Ok(Self { list })
     }
 
+    /// get the amount of items currently in the queue
     pub fn len(&self) -> usize {
         self.list.count()
     }
 
+    /// check if the queue is empty
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// get the ratio of bytes marked for deletion
+    ///
+    /// will return a value between `0.0` (optimal) and `1.0` (highly fragmented)
     pub fn wasted_file_space(&self) -> f64 {
         self.list.wasted_file_space()
     }
 
+    /// insert a new item in front of the queue and persist to disk
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// let item = String::from("some item");
+    /// queue.enqueue(&item)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn enqueue(&mut self, data: &T) -> Result<(), Box<dyn Error>> {
         self.list.insert_start(data)?;
         Ok(())
     }
 
+    /// remove the item at the back of the queue, persist to disk and return the item
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// queue.enqueue(&String::from("some item"))?;
+    /// let item = queue.dequeue()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn dequeue(&mut self) -> Result<Option<T>, Box<dyn Error>> {
         if self.len() == 0 {
             Ok(None)
@@ -66,6 +154,20 @@ where
         }
     }
 
+    /// defragment the database into a pristine state
+    ///
+    /// This will rebuild the database file under the hood and swap out/delete
+    /// the current one. This operation is quite expensive but frees up all
+    /// unused disk space, so decide for yourself when you want to do this.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// queue.compact()?;
+    /// # Ok(())
+    /// # }
     pub fn compact(&mut self) -> Result<(), Box<dyn Error>> {
         self.list.compact()?;
         Ok(())
