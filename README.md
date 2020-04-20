@@ -25,3 +25,4 @@ WIP: Collection of embeddable database models for Rust.
 ## License
 
 MIT
+
