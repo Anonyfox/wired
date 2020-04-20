@@ -16,10 +16,8 @@ jobs:
         run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose
-      - name: Read Cargo.toml
-        id: crate
-        uses: juliangruber/read-file-action@v1
+      - uses: jaliborc/action-general-autotag@1.0.0
         with:
-          path: ./Cargo.toml
-      - name: Echo Cargo.toml
-        run: echo ${{ steps.crate.outputs.content }}
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          source_file: "Cargo.toml"
+          extraction_regex: "version\\s*=\\s*\"([\\d\\.]+)\""
