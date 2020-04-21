@@ -10,7 +10,7 @@ WIP: Collection of embeddable database models for Rust.
 
 - schema-free: use anything that can be serialized with serde
 - portable: every database is persisted with a single memory-mapped binary file
-- lightweight: pure Rust implementation
+- lightweight: pure Rust implementation without many internal dependencies
 
 ## Available Models
 
@@ -25,4 +25,3 @@ WIP: Collection of embeddable database models for Rust.
 ## License
 
 MIT
-
