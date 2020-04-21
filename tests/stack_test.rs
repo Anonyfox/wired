@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use wired::{Database, Queue};
+use wired::{Database, Stack};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Message {
@@ -28,21 +28,21 @@ fn works() {
     let path = file_path.to_str().unwrap();
 
     // create new database containing "Message" instances
-    let mut db = Queue::<Message>::new(path).unwrap();
+    let mut db = Stack::<Message>::new(path).unwrap();
 
-    // enqueue some data
-    db.enqueue(&Message::new("msg 1")).unwrap();
-    db.enqueue(&Message::new("msg 2")).unwrap();
-    db.enqueue(&Message::new("msg 3")).unwrap();
-    db.enqueue(&Message::new("msg 4")).unwrap();
+    // push some data
+    db.push(&Message::new("msg 1")).unwrap();
+    db.push(&Message::new("msg 2")).unwrap();
+    db.push(&Message::new("msg 3")).unwrap();
+    db.push(&Message::new("msg 4")).unwrap();
 
     // check for usage stats
     assert_eq!(db.len(), 4);
     assert_eq!(db.wasted_file_space(), 0.0);
 
-    // dequeue some data and check for IFIO ordering
-    assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 1".to_string());
-    assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 2".to_string());
+    // pop some data and check for IFIO ordering
+    assert_eq!(db.pop().unwrap().unwrap().name, "msg 4".to_string());
+    assert_eq!(db.pop().unwrap().unwrap().name, "msg 3".to_string());
 
     // check for usage stats
     assert_eq!(db.len(), 2);
@@ -54,11 +54,11 @@ fn works() {
     assert_eq!(db.wasted_file_space(), 0.0);
 
     // works after compaction
-    assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 3".to_string());
+    assert_eq!(db.pop().unwrap().unwrap().name, "msg 2".to_string());
 
     // works after reopen
-    let mut db = Queue::<Message>::new(path).unwrap();
-    assert_eq!(db.dequeue().unwrap().unwrap().name, "msg 4".to_string());
+    let mut db = Stack::<Message>::new(path).unwrap();
+    assert_eq!(db.pop().unwrap().unwrap().name, "msg 1".to_string());
     assert_eq!(db.len(), 0);
     assert!(db.is_empty());
 }

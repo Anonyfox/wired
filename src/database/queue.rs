@@ -1,8 +1,9 @@
+use super::Database;
 use crate::model::LinkedList;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-/// a First-In-First-Out data structure
+/// a First-In-First-Out Database
 ///
 /// A `Queue` is backed by a memory-mapped file, so the full content does not
 /// reside in RAM when not needed. It is type-safe over a generic type that
@@ -97,23 +98,6 @@ where
         Ok(Self { list })
     }
 
-    /// get the amount of items currently in the queue
-    pub fn len(&self) -> usize {
-        self.list.count()
-    }
-
-    /// check if the queue is empty
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// get the ratio of bytes marked for deletion
-    ///
-    /// will return a value between `0.0` (optimal) and `1.0` (highly fragmented)
-    pub fn wasted_file_space(&self) -> f64 {
-        self.list.wasted_file_space()
-    }
-
     /// insert a new item in front of the queue and persist to disk
     ///
     /// # Examples
@@ -132,6 +116,8 @@ where
     }
 
     /// remove the item at the back of the queue, persist to disk and return the item
+    ///
+    /// Note: if you discard the dequeued item it will be lost permanently!
     ///
     /// # Examples
     ///
@@ -153,24 +139,24 @@ where
             Ok(Some(data))
         }
     }
+}
 
-    /// defragment the database into a pristine state
-    ///
-    /// This will rebuild the database file under the hood and swap out/delete
-    /// the current one. This operation is quite expensive but frees up all
-    /// unused disk space, so decide for yourself when you want to do this.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
-    /// queue.compact()?;
-    /// # Ok(())
-    /// # }
-    pub fn compact(&mut self) -> Result<(), Box<dyn Error>> {
+impl<T> Database for Queue<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
+    fn compact(&mut self) -> Result<(), Box<dyn Error>> {
         self.list.compact()?;
         Ok(())
+    }
+
+    fn wasted_file_space(&self) -> f64 {
+        self.list.wasted_file_space()
+    }
+
+    fn len(&self) -> usize {
+        self.list.count()
     }
 }
 

@@ -1,8 +1,9 @@
+use super::Database;
 use crate::model::LinkedList;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-/// a Last-In-First-Out data structure
+/// a Last-In-First-Out Database
 ///
 /// A `Stack` is backed by a memory-mapped file, so the full content does not
 /// reside in RAM when not needed. It is type-safe over a generic type that
@@ -25,6 +26,36 @@ use std::error::Error;
 /// > taking off multiple other items first.
 /// >
 /// > -- <cite>[Wikipedia](https://en.wikipedia.org/wiki/Stack_(abstract_data_type))</cite>
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // any datatype that can be serialized by serde works
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct Example {
+///     num: i32,
+/// }
+///
+/// // create a new db
+/// let mut stack = wired::Stack::<Example>::new("/path/to/file.stack")?;
+///
+/// // insert an item
+/// let item = Example { num: 42 };
+/// stack.push(&item)?;
+///
+/// // retrieve an item
+/// let item = stack.pop()?;
+/// dbg!(item); // Some(Example { num: 42 })
+///
+/// // try retrieve an item from the now-empty queue
+/// let item = stack.pop()?;
+/// dbg!(item); // None
+/// # Ok(())
+/// # }
+/// ```
 pub struct Stack<T> {
     list: LinkedList<T>,
 }
@@ -34,24 +65,71 @@ where
     T: Serialize,
     for<'de> T: Deserialize<'de>,
 {
+    /// Create a new database or open an existing one for the given location.
+    /// The database is generic over a serializable datatype.
+    ///
+    /// # Examples
+    ///
+    /// Stack for strings:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stack = wired::Stack::<String>::new("/path/to/file.stack")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Stack for structs:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Example {
+    ///     count: i32,
+    /// }
+    ///
+    /// let stack = wired::Stack::<Example>::new("/path/to/file.stack")?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
         let list = LinkedList::new(path)?;
         Ok(Self { list })
     }
 
-    pub fn len(&self) -> usize {
-        self.list.count()
-    }
-
-    pub fn wasted_file_space(&self) -> f64 {
-        self.list.wasted_file_space()
-    }
-
+    /// insert a new item at the end of the stack and persist to disk
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut stack = wired::Stack::<String>::new("/path/to/file.stack")?;
+    /// let item = String::from("some item");
+    /// stack.push(&item)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn push(&mut self, data: &T) -> Result<(), Box<dyn Error>> {
         self.list.insert_end(data)?;
         Ok(())
     }
 
+    /// remove the item at the and of the stack, persist to disk and return the item
+    ///
+    /// Note: if you discard the popped item it will be lost permanently!
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut stack = wired::Stack::<String>::new("/path/to/file.stack")?;
+    /// stack.push(&String::from("some item"))?;
+    /// let item = stack.pop()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn pop(&mut self) -> Result<Option<T>, Box<dyn Error>> {
         if self.len() == 0 {
             Ok(None)
@@ -62,10 +140,24 @@ where
             Ok(Some(data))
         }
     }
+}
 
-    pub fn compact(&mut self) -> Result<(), Box<dyn Error>> {
+impl<T> Database for Stack<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
+    fn compact(&mut self) -> Result<(), Box<dyn Error>> {
         self.list.compact()?;
         Ok(())
+    }
+
+    fn wasted_file_space(&self) -> f64 {
+        self.list.wasted_file_space()
+    }
+
+    fn len(&self) -> usize {
+        self.list.count()
     }
 }
 
