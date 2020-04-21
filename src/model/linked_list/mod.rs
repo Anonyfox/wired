@@ -216,7 +216,7 @@ where
     pub fn iter(&self) -> Result<LinkedListIterator<T>, Error> {
         Ok(LinkedListIterator {
             current_node_ptr: self.first_node()?.map(|n| n.start()),
-            backend: &self.backend,
+            backend: &*self.backend,
             data_type: PhantomData,
         })
     }
@@ -224,7 +224,7 @@ where
 
 pub struct LinkedListIterator<'a, T> {
     current_node_ptr: Option<usize>,
-    backend: &'a Box<dyn Backend>,
+    backend: &'a dyn Backend,
     data_type: PhantomData<T>,
 }
 
@@ -250,8 +250,8 @@ where
 {
     fn try_next(&mut self) -> Result<Option<Node<T>>, Error> {
         if let Some(current_node_ptr) = self.current_node_ptr {
-            let current_node = Node::load(&**self.backend, current_node_ptr)?;
-            let next_node = current_node.next(&**self.backend)?;
+            let current_node = Node::load(&*self.backend, current_node_ptr)?;
+            let next_node = current_node.next(&*self.backend)?;
             self.current_node_ptr = next_node.map(|n| n.start());
             Ok(Some(current_node))
         } else {
