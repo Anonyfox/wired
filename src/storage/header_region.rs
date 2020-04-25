@@ -45,12 +45,4 @@ impl Backend {
         let bytes = &mapped_file[range];
         Ok(bincode::deserialize_from(bytes)?)
     }
-
-    pub fn update_header(&mut self, header: &HeaderRegion) -> Result<(), Box<dyn Error>> {
-        let end = HeaderRegion::size();
-        let range = RangeTo { end };
-        let bytes: Vec<u8> = bincode::serialize(header)?;
-        (&mut self.mapped_file[range]).write_all(&bytes)?;
-        Ok(())
-    }
 }
