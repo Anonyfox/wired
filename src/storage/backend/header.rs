@@ -20,13 +20,6 @@ impl Header {
         Self::size()
     }
 
-    pub fn read(mmap: &MmapMut) -> Result<Self, Box<dyn Error>> {
-        let end = Header::size();
-        let range = RangeTo { end };
-        let bytes = &mmap[range];
-        Ok(bincode::deserialize_from(bytes)?)
-    }
-
     pub fn update(&self, mmap: &mut MmapMut) -> Result<(), Box<dyn Error>> {
         let end = Header::size();
         let range = RangeTo { end };

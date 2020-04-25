@@ -28,10 +28,6 @@ impl Frame {
         FRAME_SIZE - Self::header_size()
     }
 
-    pub fn free_bytes(&self) -> usize {
-        Self::capacity() - self.body_size
-    }
-
     pub fn total_size() -> usize {
         FRAME_SIZE
     }
