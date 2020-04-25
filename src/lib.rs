@@ -1,6 +1,7 @@
 mod backend;
 mod database;
 mod model;
+pub mod storage;
 
 pub use database::queue::Queue;
 pub use database::stack::Stack;
