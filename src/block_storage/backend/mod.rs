@@ -110,6 +110,10 @@ impl Backend {
     pub fn block_size() -> usize {
         frames::Frame::total_size()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.header.frame_count == 0
+    }
 }
 
 #[cfg(test)]

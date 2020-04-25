@@ -34,6 +34,10 @@ impl BlockStorage {
         let position = index_to_position(index);
         self.backend.delete(position)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.backend.is_empty()
+    }
 }
 
 fn position_to_index(position: usize) -> usize {
