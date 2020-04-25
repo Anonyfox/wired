@@ -69,7 +69,7 @@ impl Backend {
     pub fn read_frame_body(&self, position: usize) -> Result<&[u8], Box<dyn Error>> {
         let frame = self.read_frame(position)?;
         let start = Frame::header_size() + position;
-        let end = frame.body_size + position;
+        let end = start + frame.body_size;
         let range = Range { start, end };
         Ok(&self.mapped_file[range])
     }
