@@ -29,7 +29,7 @@ impl Backend {
 
     /// runtime: O(n)
     pub fn create(&mut self, bytes: &[u8]) -> Result<usize, Box<dyn Error>> {
-        let start = self.next_free_frame_position()?;
+        let start = self.next_free_frame()?;
         self.write_bytes_starting_at(start, bytes)?;
         self.flush()?;
         Ok(start)
@@ -46,9 +46,9 @@ impl Backend {
         for (index, byte_chunk) in bytes.chunks(chunk_size).enumerate() {
             // use the given position on first iteration
             let position = if index == 0 {
-                start
+                self.unlink_free_frame(start)?
             } else {
-                self.next_free_frame_position()?
+                self.next_free_frame()?
             };
 
             // persist the chunk into a frame
@@ -94,11 +94,14 @@ impl Backend {
         let mut cursor: usize = position;
         while cursor != 0 {
             let mut frame = self.read_frame(cursor)?;
+            let current = cursor;
             cursor = frame.next;
             frame.deleted = true;
-            frame.next = 0;
+            frame.next = self.header.first_free_frame;
+            self.header.first_free_frame = current;
             self.update_frame(frame)?;
         }
+        self.header.update(&mut self.mapped_file)?;
         self.flush()?;
         Ok(())
     }
@@ -128,16 +131,16 @@ mod tests {
 
         // insert simple element
         let position = backend.create(b"hello").expect("could not create");
-        assert_eq!(position, 16);
+        assert_eq!(position, 24);
 
         // confirm by reading back
-        let data = backend.read(16).expect("could not read");
+        let data = backend.read(position).expect("could not read");
         assert_eq!(data, b"hello");
 
         // insert multi-frame element
         let long_data = (0..1025).map(|_| 1 as u8).collect::<Vec<u8>>();
         let position = backend.create(&long_data).expect("could not create");
-        assert_eq!(position, 16 + 1024);
+        assert_eq!(position, 24 + 1024);
 
         // confirm by reading back
         let long_data = backend.read(position).expect("could not read");
@@ -153,7 +156,7 @@ mod tests {
         // insert multi-frame element
         let long_data = (0..1025).map(|_| 1 as u8).collect::<Vec<u8>>();
         let position = backend.create(&long_data).expect("could not create");
-        assert_eq!(position, 16);
+        assert_eq!(position, 24);
 
         // confirm by reading back
         let long_data = backend.read(position).expect("could not read");
@@ -162,7 +165,7 @@ mod tests {
         // update with simple element
         let data = (0..10).map(|_| 1 as u8).collect::<Vec<u8>>();
         backend.update(position, &data).expect("could not create");
-        assert_eq!(position, 16);
+        assert_eq!(position, 24);
 
         // confirm by reading back
         let data = backend.read(position).expect("could not read");

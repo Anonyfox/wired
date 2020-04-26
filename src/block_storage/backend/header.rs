@@ -9,15 +9,12 @@ use std::ops::RangeTo;
 pub struct Header {
     pub frame_count: usize,
     pub version: usize,
+    pub first_free_frame: usize,
 }
 
 impl Header {
     pub fn size() -> usize {
         std::mem::size_of::<Self>()
-    }
-
-    pub fn first_frame_position() -> usize {
-        Self::size()
     }
 
     pub fn update(&self, mmap: &mut MmapMut) -> Result<(), Box<dyn Error>> {
