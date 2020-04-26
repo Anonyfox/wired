@@ -13,6 +13,7 @@ WIP: Collection of embeddable database models for Rust.
 - **lightweight**: pure Rust implementation without many internal dependencies
 - **broadly available**: works on current stable rust
 - **efficient**: uses a self-managed block storage that recycles memory
+- **fast**: reading and writing should both be a `O(1)` operation
 
 ## Available Models
 
