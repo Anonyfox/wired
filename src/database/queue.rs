@@ -1,7 +1,8 @@
-use super::Database;
-use crate::model::LinkedList;
+use crate::block_storage::BlockStorage;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::fs::File;
+use std::marker::PhantomData;
 
 /// a First-In-First-Out Database
 ///
@@ -39,11 +40,12 @@ use std::error::Error;
 /// }
 ///
 /// // create a new db
-/// let mut queue = wired::Queue::<Example>::new("/path/to/file.queue")?;
+/// # let file = tempfile::tempfile()?;
+/// let mut queue = wired::Queue::<Example>::new(file)?;
 ///
 /// // insert an item
 /// let item = Example { num: 42 };
-/// queue.enqueue(&item)?;
+/// queue.enqueue(item)?;
 ///
 /// // retrieve an item
 /// let item = queue.dequeue()?;
@@ -55,8 +57,11 @@ use std::error::Error;
 /// # Ok(())
 /// # }
 /// ```
+
 pub struct Queue<T> {
-    list: LinkedList<T>,
+    store: BlockStorage,
+    header: Header,
+    data_type: PhantomData<T>,
 }
 
 impl<T> Queue<T>
@@ -73,7 +78,8 @@ where
     ///
     /// ```rust,no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// # let file = tempfile::tempfile()?;
+    /// let queue = wired::Queue::<String>::new(file)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -89,13 +95,48 @@ where
     ///     count: i32,
     /// }
     ///
-    /// let queue = wired::Queue::<Example>::new("/path/to/file.queue")?;
+    /// # let file = tempfile::tempfile()?;
+    /// let queue = wired::Queue::<Example>::new(file)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(path: &str) -> Result<Self, Box<dyn Error>> {
-        let list = LinkedList::new(path)?;
-        Ok(Self { list })
+    pub fn new(file: File) -> Result<Self, Box<dyn Error>> {
+        let mut store = BlockStorage::new(file)?;
+        let header = Self::read_header(&mut store)?;
+        let data_type = PhantomData;
+        let mut queue = Self {
+            store,
+            header,
+            data_type,
+        };
+        queue.save_header()?;
+        Ok(queue)
+    }
+
+    pub fn len(&self) -> usize {
+        self.header.elements_count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn read_header(store: &mut BlockStorage) -> Result<Header, Box<dyn Error>> {
+        let bytes = store.read(0)?;
+        if store.is_empty() {
+            let header = Header::default();
+            let bytes: Vec<u8> = bincode::serialize(&header)?;
+            store.create(bytes.as_slice())?;
+            Ok(header)
+        } else {
+            let header = bincode::deserialize_from(bytes.as_slice())?;
+            Ok(header)
+        }
+    }
+
+    fn save_header(&mut self) -> Result<(), Box<dyn Error>> {
+        let bytes: Vec<u8> = bincode::serialize(&self.header)?;
+        self.store.update(0, bytes.as_slice())
     }
 
     /// insert a new item in front of the queue and persist to disk
@@ -104,14 +145,39 @@ where
     ///
     /// ```rust,no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
+    /// # let file = tempfile::tempfile()?;
+    /// let mut queue = wired::Queue::<String>::new(file)?;
     /// let item = String::from("some item");
-    /// queue.enqueue(&item)?;
+    /// queue.enqueue(item)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn enqueue(&mut self, data: &T) -> Result<(), Box<dyn Error>> {
-        self.list.insert_start(data)?;
+    pub fn enqueue(&mut self, data: T) -> Result<(), Box<dyn Error>> {
+        let mut element = Element {
+            body: data,
+            next: 0,
+            prev: 0,
+        };
+        if self.header.first_element != 0 {
+            element.next = self.header.first_element;
+        }
+        let bytes: Vec<u8> = bincode::serialize(&element)?;
+        let index = self.store.create(bytes.as_slice())?;
+
+        if self.header.first_element != 0 {
+            let first_index = self.header.first_element;
+            let first_bytes = self.store.read(first_index)?;
+            let mut first: Element<T> = bincode::deserialize_from(first_bytes.as_slice())?;
+            first.prev = index;
+            let first_bytes: Vec<u8> = bincode::serialize(&first)?;
+            self.store.update(first_index, first_bytes.as_slice())?;
+        }
+        if self.header.last_element == 0 {
+            self.header.last_element = index;
+        }
+        self.header.first_element = index;
+        self.header.elements_count += 1;
+        self.save_header()?;
         Ok(())
     }
 
@@ -123,40 +189,25 @@ where
     ///
     /// ```rust,no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut queue = wired::Queue::<String>::new("/path/to/file.queue")?;
-    /// queue.enqueue(&String::from("some item"))?;
+    /// # let file = tempfile::tempfile()?;
+    /// let mut queue = wired::Queue::<String>::new(file)?;
+    /// queue.enqueue(String::from("some item"))?;
     /// let item = queue.dequeue()?;
     /// # Ok(())
     /// # }
     /// ```
     pub fn dequeue(&mut self) -> Result<Option<T>, Box<dyn Error>> {
-        if self.len() == 0 {
-            Ok(None)
-        } else {
-            let node = self.list.last_node()?.unwrap();
-            let data: T = self.list.get_node_data(&node)?;
-            self.list.remove(node)?;
-            Ok(Some(data))
+        if self.header.elements_count == 0 {
+            return Ok(None);
         }
-    }
-}
-
-impl<T> Database for Queue<T>
-where
-    T: Serialize,
-    for<'de> T: Deserialize<'de>,
-{
-    fn compact(&mut self) -> Result<(), Box<dyn Error>> {
-        self.list.compact()?;
-        Ok(())
-    }
-
-    fn wasted_file_space(&self) -> f64 {
-        self.list.wasted_file_space()
-    }
-
-    fn len(&self) -> usize {
-        self.list.count()
+        let index = self.header.last_element;
+        let bytes = self.store.read(index)?;
+        let element: Element<T> = bincode::deserialize_from(bytes.as_slice())?;
+        self.store.delete(index)?;
+        self.header.last_element = element.prev;
+        self.header.elements_count -= 1;
+        self.save_header()?;
+        Ok(Some(element.body))
     }
 }
 
@@ -172,17 +223,32 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default)]
+struct Header {
+    first_element: usize,
+    last_element: usize,
+    elements_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Element<T> {
+    next: usize,
+    prev: usize,
+    body: T,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn works() {
-        let mut queue = Queue::<i32>::new("works.queue").expect("could not create");
+        let file = tempfile::tempfile().expect("could not create tempfile");
+        let mut queue = Queue::<i32>::new(file).expect("could not create");
         assert_eq!(queue.len(), 0);
 
-        queue.enqueue(&1).expect("could not enqueue");
-        queue.enqueue(&2).expect("could not enqueue");
+        queue.enqueue(1).expect("could not enqueue");
+        queue.enqueue(2).expect("could not enqueue");
         assert_eq!(queue.len(), 2);
 
         let data = queue.dequeue().expect("could not dequeue");
@@ -199,9 +265,10 @@ mod tests {
 
     #[test]
     fn iteration() {
-        let mut queue = Queue::<i32>::new("works.queue").expect("could not create");
-        queue.enqueue(&1).expect("could not enqueue");
-        queue.enqueue(&2).expect("could not enqueue");
+        let file = tempfile::tempfile().expect("could not create tempfile");
+        let mut queue = Queue::<i32>::new(file).expect("could not create");
+        queue.enqueue(1).expect("could not enqueue");
+        queue.enqueue(2).expect("could not enqueue");
         assert_eq!(queue.len(), 2);
 
         let vec: Vec<i32> = queue.collect();

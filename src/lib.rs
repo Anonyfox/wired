@@ -5,7 +5,6 @@ mod model;
 
 pub use database::queue::Queue;
 pub use database::stack::Stack;
-pub use database::Database;
 
 #[cfg(test)]
 mod tests {
