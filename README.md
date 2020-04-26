@@ -23,14 +23,6 @@ WIP: Collection of embeddable database models for Rust.
 - [ ] Tabular
 - [ ] Relational
 
-## Copy-On-Write
-
-Every database type uses a "copy-on-write"-mechanism. Therefore, any time a new
-record is persisted or an existing record is updated, the database file will
-grow accordingly. This results in really fast write operations in exchange for
-a larger-than-neccessary data file on disk. It is possible to defragment a
-database file by calling the `compact()` method, though.
-
 ## License
 
 MIT
