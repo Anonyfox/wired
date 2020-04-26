@@ -199,6 +199,18 @@ where
     }
 }
 
+impl<T> Iterator for Stack<T>
+where
+    T: Serialize,
+    for<'de> T: Deserialize<'de>,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pop().unwrap_or(None)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct Header {
     last_element: usize,
@@ -237,14 +249,15 @@ mod tests {
         assert_eq!(data, None);
     }
 
-    // #[test]
-    // fn iteration() {
-    //     let mut stack = Stack::<i32>::new("works.stack").expect("could not create");
-    //     stack.push(&1).expect("could not push");
-    //     stack.push(&2).expect("could not push");
-    //     assert_eq!(stack.len(), 2);
+    #[test]
+    fn iteration() {
+        let file = tempfile::tempfile().expect("could not create tempfile");
+        let mut stack = Stack::<i32>::new(file).expect("could not create");
+        stack.push(1).expect("could not push");
+        stack.push(2).expect("could not push");
+        assert_eq!(stack.len(), 2);
 
-    //     let vec: Vec<i32> = stack.collect();
-    //     assert_eq!(vec, vec![2, 1]);
-    // }
+        let vec: Vec<i32> = stack.collect();
+        assert_eq!(vec, vec![2, 1]);
+    }
 }
