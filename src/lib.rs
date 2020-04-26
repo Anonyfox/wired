@@ -1,6 +1,7 @@
 mod block_storage;
 mod database;
 
+pub use database::key_value::KeyValue;
 pub use database::queue::Queue;
 pub use database::stack::Stack;
 

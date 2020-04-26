@@ -38,6 +38,15 @@ impl BlockStorage {
     pub fn is_empty(&self) -> bool {
         self.backend.is_empty()
     }
+
+    // pub fn list_indices(&self) -> Result<Vec<usize>, Box<dyn Error>> {
+    //     let positions = self.backend.collect_head_nodes()?;
+    //     let indexes = positions
+    //         .iter()
+    //         .map(|pos| position_to_index(*pos))
+    //         .collect();
+    //     Ok(indexes)
+    // }
 }
 
 fn position_to_index(position: usize) -> usize {

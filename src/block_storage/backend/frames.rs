@@ -1,3 +1,4 @@
+// use super::header::Header;
 use super::Backend;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -85,4 +86,24 @@ impl Backend {
         self.update_frame(frame)?;
         Ok(())
     }
+
+    // pub fn collect_head_nodes(&self) -> Result<Vec<usize>, Box<dyn Error>> {
+    //     let mut result: Vec<usize> = vec![];
+    //     let mut tail_nodes: Vec<usize> = vec![];
+    //     let offset = Header::size();
+    //     let frame_size = Frame::total_size();
+    //     let mut index: usize = 0;
+    //     while index < self.header.frame_count {
+    //         let position = offset + index * frame_size;
+    //         let frame = self.read_frame(position)?;
+    //         if frame.next != 0 {
+    //             tail_nodes.push(frame.next);
+    //         }
+    //         if !tail_nodes.contains(&position) && !frame.deleted {
+    //             result.push(position);
+    //         }
+    //         index += 1;
+    //     }
+    //     Ok(result)
+    // }
 }
