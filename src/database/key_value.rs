@@ -1,19 +1,22 @@
 use crate::block_storage::BlockStorage;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 pub struct KeyValue<K, V> {
     store: BlockStorage,
     header: Header,
+    lookup: HashMap<K, usize>,
     key_type: PhantomData<K>,
     value_type: PhantomData<V>,
 }
 
 impl<K, V> KeyValue<K, V>
 where
-    K: Serialize + Eq,
+    K: Serialize + Hash + Eq,
     for<'de> K: Deserialize<'de>,
     V: Serialize,
     for<'de> V: Deserialize<'de>,
@@ -24,10 +27,16 @@ where
         let mut kv = Self {
             store,
             header,
+            lookup: HashMap::new(),
             key_type: PhantomData,
             value_type: PhantomData,
         };
         kv.save_header()?;
+        for index in kv.header.key_indices.iter() {
+            let bytes = kv.store.read(*index)?;
+            let entry: KeyEntry<K> = bincode::deserialize_from(bytes.as_slice())?;
+            kv.lookup.insert(entry.body, entry.value_index);
+        }
         Ok(kv)
     }
 
@@ -57,17 +66,18 @@ where
         self.len() == 0
     }
 
-    pub fn get(&mut self, key: K) -> Result<Option<V>, Box<dyn Error>> {
-        let mut hit: Option<KeyEntry<K>> = None;
-        for index in self.header.key_indices.iter() {
-            let key_bytes = self.store.read(*index)?;
-            let key_entry: KeyEntry<K> = bincode::deserialize_from(key_bytes.as_slice())?;
-            if key_entry.body == key {
-                hit = Some(key_entry);
-            }
+    pub fn keys(&self) -> Vec<&K> {
+        let mut result: Vec<&K> = vec![];
+        for key in self.lookup.keys() {
+            result.push(key);
         }
-        if let Some(key_entry) = hit {
-            let value_bytes = self.store.read(key_entry.value_index)?;
+        result
+    }
+
+    pub fn get(&mut self, key: &K) -> Result<Option<V>, Box<dyn Error>> {
+        if let Some(value_index) = self.lookup.get(&key) {
+            dbg!(&value_index);
+            let value_bytes = self.store.read(*value_index)?;
             let value = bincode::deserialize_from(value_bytes.as_slice())?;
             Ok(Some(value))
         } else {
@@ -76,19 +86,22 @@ where
     }
 
     pub fn set(&mut self, key: K, value: V) -> Result<(), Box<dyn Error>> {
-        // todo: check existing key
+        if self.lookup.contains_key(&key) {
+            self.remove(&key)?;
+        }
 
         // insert value
         let value_bytes: Vec<u8> = bincode::serialize(&value)?;
         let value_index = self.store.create(value_bytes.as_slice())?;
 
         // insert key
-        let key = KeyEntry {
+        let key_entry = KeyEntry {
             body: key,
             value_index,
         };
-        let key_bytes = bincode::serialize(&key)?;
+        let key_bytes = bincode::serialize(&key_entry)?;
         let key_index = self.store.create(key_bytes.as_slice())?;
+        self.lookup.insert(key_entry.body, key_entry.value_index);
 
         // update header
         self.header.key_indices.push(key_index);
@@ -96,13 +109,13 @@ where
         Ok(())
     }
 
-    pub fn remove(&mut self, key: K) -> Result<(), Box<dyn Error>> {
+    pub fn remove(&mut self, key: &K) -> Result<(), Box<dyn Error>> {
         let mut hit: Option<KeyEntry<K>> = None;
         let mut hit_index: Option<usize> = None;
         for index in self.header.key_indices.iter() {
             let key_bytes = self.store.read(*index)?;
             let key_entry: KeyEntry<K> = bincode::deserialize_from(key_bytes.as_slice())?;
-            if key_entry.body == key {
+            if key_entry.body == *key {
                 hit = Some(key_entry);
                 hit_index = Some(*index);
             }
@@ -110,6 +123,7 @@ where
         if let Some(key_entry) = hit {
             self.store.delete(key_entry.value_index)?;
             self.store.delete(hit_index.unwrap())?;
+            self.lookup.remove(&key_entry.body);
             let index_position = self
                 .header
                 .key_indices
@@ -144,19 +158,31 @@ mod tests {
         let file = tempfile::tempfile().expect("could not create tempfile");
         let mut kv = KeyValue::<i32, i32>::new(file).expect("could not create");
         assert_eq!(kv.len(), 0);
+        assert_eq!(kv.keys(), Vec::<&i32>::new());
 
         // insert data
         kv.set(17, 42).expect("can not set");
         assert_eq!(kv.len(), 1);
+        assert_eq!(kv.keys(), vec![&17]);
 
         // read data
-        let v = kv.get(17).expect("can not get");
+        let v = kv.get(&17).expect("can not get");
         assert_eq!(v, Some(42));
 
+        // update data
+        kv.set(17, 101).expect("can not set");
+        assert_eq!(kv.len(), 1);
+        assert_eq!(kv.keys(), vec![&17]);
+
+        // read data again
+        let v = kv.get(&17).expect("can not get");
+        assert_eq!(v, Some(101));
+
         // remove data
-        kv.remove(17).expect("could not remove");
+        kv.remove(&17).expect("could not remove");
         assert_eq!(kv.len(), 0);
-        let v = kv.get(17).expect("can not get");
+        assert_eq!(kv.keys(), Vec::<&i32>::new());
+        let v = kv.get(&17).expect("can not get");
         assert_eq!(v, None);
     }
 }
