@@ -1,7 +1,5 @@
-mod backend;
-pub mod block_storage;
+mod block_storage;
 mod database;
-mod model;
 
 pub use database::queue::Queue;
 pub use database::stack::Stack;
