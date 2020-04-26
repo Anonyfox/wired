@@ -6,6 +6,55 @@ use std::fs::File;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
+/// Key Value Database
+///
+/// Definition:
+///
+/// > A key-value database, or key-value store, is a data storage paradigm
+/// > designed for storing, retrieving, and managing associative arrays, and a
+/// > data structure more commonly known today as a dictionary or hash table.
+/// > Dictionaries contain a collection of objects, or records, which in turn
+/// > have many different fields within them, each containing data. These
+/// > records are stored and retrieved using a key that uniquely identifies the
+/// > record, and is used to find the data within the database.
+/// >
+/// > -- <cite>[Wikipedia](https://en.wikipedia.org/wiki/Key-value_database)</cite>
+///
+/// Keys and Values can be arbitrary data types, as long as they can be
+/// serialized to bincode via serde. using `#[derive(Serialize, Deserialize)]`
+/// on your structs should suffice. Keys must implement the `Eq` and `Hash`
+/// trait.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // any datatype that can be serialized by serde works
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct Value {
+///     num: i32,
+/// }
+///
+/// // create a new db
+/// # let file = tempfile::tempfile()?;
+/// let mut kv = wired::KeyValue::<String, Value>::new(file)?;
+///
+/// // insert an item
+/// let key = String::from("some identifier");
+/// let value = Value { num: 42 };
+/// kv.set(key, value);
+///
+/// // retrieve an item
+/// let key = String::from("some identifier");
+/// let value = kv.get(&key)?; // Some(Value { num: 42 })
+///
+/// // delete an item
+/// let key = String::from("some identifier");
+/// kv.remove(&key)?;
+/// # Ok(())
+/// # }
 pub struct KeyValue<K, V> {
     store: BlockStorage,
     header: Header,

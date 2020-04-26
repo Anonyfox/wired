@@ -8,16 +8,18 @@ WIP: Collection of embeddable database models for Rust.
 
 ## Features
 
-- schema-free: use anything that can be serialized with serde
-- portable: every database is persisted with a single memory-mapped binary file
-- lightweight: pure Rust implementation without many internal dependencies
+- **schema-free**: use anything that can be serialized with serde/bincode
+- **portable**: every database is persisted with a single memory-mapped binary file
+- **lightweight**: pure Rust implementation without many internal dependencies
+- **broadly available**: works on current stable rust
+- **efficient**: uses a self-managed block storage that recycles memory
 
 ## Available Models
 
 - [x] Stack
 - [x] Queue
 - [ ] Log
-- [ ] Key-Value
+- [x] Key-Value
 - [ ] Document
 - [ ] Graph
 - [ ] Tabular
