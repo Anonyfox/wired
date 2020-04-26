@@ -4,6 +4,61 @@ use std::error::Error;
 use std::fs::File;
 use std::marker::PhantomData;
 
+/// a Last-In-First-Out Database
+///
+/// A `Stack` is backed by a memory-mapped file, so the full content does not
+/// reside in RAM when not needed. It is type-safe over a generic type that
+/// can be serialized through `serde`.
+///
+/// What exactly is a Stack?
+///
+/// > In computer science, a stack is an abstract data type that serves as a
+/// > collection of elements, with two principal operations:
+/// >
+/// > * push, which adds an element to the collection, and
+/// > * pop, which removes the most recently added element that was not yet removed.
+/// >
+/// > The order in which elements come off a stack gives rise to its alternative
+/// > name, LIFO (last in, first out). Additionally, a peek operation may give
+/// > access to the top without modifying the stack. The name "stack" for
+/// > this type of structure comes from the analogy to a set of physical items
+/// > stacked on top of each other, which makes it easy to take an item off the
+/// > top of the stack, while getting to an item deeper in the stack may require
+/// > taking off multiple other items first.
+/// >
+/// > -- <cite>[Wikipedia](https://en.wikipedia.org/wiki/Stack_(abstract_data_type))</cite>
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // any datatype that can be serialized by serde works
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct Example {
+///     num: i32,
+/// }
+///
+/// // create a new db
+/// # let file = tempfile::tempfile()?;
+/// let mut stack = wired::Stack::<Example>::new(file)?;
+///
+/// // insert an item
+/// let item = Example { num: 42 };
+/// stack.push(item)?;
+///
+/// // retrieve an item
+/// let item = stack.pop()?;
+/// dbg!(item); // Some(Example { num: 42 })
+///
+/// // try retrieve an item from the now-empty queue
+/// let item = stack.pop()?;
+/// dbg!(item); // None
+/// # Ok(())
+/// # }
+/// ```
+
 pub struct Stack<T> {
     store: BlockStorage,
     header: Header,
@@ -15,6 +70,37 @@ where
     T: Serialize,
     for<'de> T: Deserialize<'de>,
 {
+    /// Create a new database or open an existing one for the given location.
+    /// The database is generic over a serializable datatype.
+    ///
+    /// # Examples
+    ///
+    /// Stack for strings:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let file = tempfile::tempfile()?;
+    /// let stack = wired::Stack::<String>::new(file)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Stack for structs:
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Example {
+    ///     count: i32,
+    /// }
+    ///
+    /// # let file = tempfile::tempfile()?;
+    /// let stack = wired::Stack::<Example>::new(file)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(file: File) -> Result<Self, Box<dyn Error>> {
         let mut store = BlockStorage::new(file)?;
         let header = Self::read_header(&mut store)?;
@@ -54,6 +140,19 @@ where
         self.store.update(0, bytes.as_slice())
     }
 
+    /// insert a new item at the end of the stack and persist to disk
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let file = tempfile::tempfile()?;
+    /// let mut stack = wired::Stack::<String>::new(file)?;
+    /// let item = String::from("some item");
+    /// stack.push(item)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn push(&mut self, data: T) -> Result<(), Box<dyn Error>> {
         let mut element = Element {
             body: data,
@@ -70,6 +169,21 @@ where
         Ok(())
     }
 
+    /// remove the item at the and of the stack, persist to disk and return the item
+    ///
+    /// Note: if you discard the popped item it will be lost permanently!
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let file = tempfile::tempfile()?;
+    /// let mut stack = wired::Stack::<String>::new(file)?;
+    /// stack.push(String::from("some item"))?;
+    /// let item = stack.pop()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn pop(&mut self) -> Result<Option<T>, Box<dyn Error>> {
         if self.header.elements_count == 0 {
             return Ok(None);
