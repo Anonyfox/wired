@@ -123,7 +123,7 @@ where
         result
     }
 
-    pub fn get(&mut self, key: &K) -> Result<Option<V>, Box<dyn Error>> {
+    pub fn get(&self, key: &K) -> Result<Option<V>, Box<dyn Error>> {
         if let Some(value_index) = self.lookup.get(&key) {
             let value_bytes = self.store.read(*value_index)?;
             let value = bincode::deserialize_from(value_bytes.as_slice())?;
